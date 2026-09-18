@@ -52,7 +52,7 @@ export const CAMERA_TARGET_MARGIN = 70;
 // way back to level 1.
 export const LEVEL_TRAVEL = [260, H, 2 * H];
 export const POINTS_TO_ADVANCE = 10;
-export const ARROWS_PER_LEVEL = [3, 3, 5];
+export const ARROWS_PER_LEVEL = [3, 4, 5];
 
 // --- Target rings ----------------------------------------------------------
 // Outer to inner. `frac` is the ring's outer edge as a fraction of
