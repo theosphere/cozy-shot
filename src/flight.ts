@@ -252,7 +252,19 @@ function updateFlight(dt: number) {
       else audio.playMiss();
       const title = ring.score > 0 ? ring.label : 'OFF TARGET';
       const outcome = levels.recordShot(ring.score);
-      if (outcome === 'advance') {
+      if (levels.freeShooting) {
+        // No arrows/points/levels here — just a fresh wind for the next
+        // shot, and the piñata treat again on every bullseye.
+        rollWind();
+        if (ring.label === 'BULLSEYE') {
+          celebrating = true;
+          celebrationTimer = CELEBRATION_DURATION;
+          celebrationX = flyX;
+          celebrationY = flyY;
+          celebration.spawnConfetti(flyX, flyY);
+        }
+        beginResult(title, ring.score > 0 ? `SCORE ${ring.score}` : 'MISSED THE BOARD', true);
+      } else if (outcome === 'advance') {
         pendingApplyLevel = true;
         briefingHeader = 'LEVEL UP';
         beginResult(title, `LEVEL ${levels.level}`, true);
@@ -286,7 +298,10 @@ function updateFlight(dt: number) {
       audio.stopFlightSound();
       audio.playMiss();
       const outcome = levels.recordShot(0);
-      if (outcome === 'fail') {
+      if (levels.freeShooting) {
+        rollWind();
+        beginResult('FELL SHORT', 'PULL HARDER', false);
+      } else if (outcome === 'fail') {
         pendingApplyLevel = true;
         briefingHeader = 'TRY AGAIN';
         beginResult('FELL SHORT', 'TRY AGAIN', false);
