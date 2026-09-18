@@ -1,4 +1,4 @@
-// cozy-shot — a portrait touch toy: a bow lying horizontally near
+// cozy-shot — a portrait touch archery game: a bow lying horizontally near
 // the bottom of the screen. Each level attempt opens with a wind briefing
 // (direction + strength, randomized, shown on a compass), then you drag
 // the nocked arrow away from the bow to draw the string (further pull =
