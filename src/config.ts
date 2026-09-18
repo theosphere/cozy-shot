@@ -45,12 +45,14 @@ export const CAMERA_TARGET_MARGIN = 70;
 // --- Levels --------------------------------------------------------------
 // Level 1's target sits on the bow's own screen; level 2's after one
 // screen of scroll; level 3's after two. Each level gives you a fixed
-// budget of arrows: reach POINTS_TO_ADVANCE before you run out and you
-// clear it (points reset to 0, no carryover into the next level); run out
-// of arrows first and you're sent all the way back to level 1.
+// budget of arrows (fewer for the close, easy levels; more once level 3's
+// long, risky distance needs the extra tries): reach POINTS_TO_ADVANCE
+// before you run out and you clear it (points reset to 0, no carryover
+// into the next level); run out of arrows first and you're sent all the
+// way back to level 1.
 export const LEVEL_TRAVEL = [260, H, 2 * H];
 export const POINTS_TO_ADVANCE = 10;
-export const ARROWS_PER_LEVEL = 5;
+export const ARROWS_PER_LEVEL = [3, 3, 5];
 
 // --- Target rings ----------------------------------------------------------
 // Outer to inner. `frac` is the ring's outer edge as a fraction of

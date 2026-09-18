@@ -10,7 +10,7 @@ import { TEXT_COLOR, TEXT_DIM } from './palette';
 
 export let level = 1;
 export let levelPoints = 0;
-export let arrowsLeft = ARROWS_PER_LEVEL;
+export let arrowsLeft = ARROWS_PER_LEVEL[0];
 // Unlocked from the post-victory choice panel (see flight.ts's
 // 'victoryChoice' state) — shoot level 3 for as long as you want with no
 // arrow budget or point threshold. recordShot short-circuits below.
@@ -68,16 +68,17 @@ export function recordShot(score: number): ShotOutcome {
 
   if (levelPoints >= POINTS_TO_ADVANCE) {
     levelPoints = 0;
-    arrowsLeft = ARROWS_PER_LEVEL;
     if (level < LEVEL_TRAVEL.length) {
       level += 1;
+      arrowsLeft = ARROWS_PER_LEVEL[level - 1]; // the level just reached
       return 'advance';
     }
+    arrowsLeft = ARROWS_PER_LEVEL[level - 1];
     return 'complete';
   }
   if (arrowsLeft <= 0) {
     levelPoints = 0;
-    arrowsLeft = ARROWS_PER_LEVEL;
+    arrowsLeft = ARROWS_PER_LEVEL[level - 1]; // retrying the same level
     return 'fail';
   }
   return 'continue';
@@ -93,7 +94,7 @@ export function resetGame() {
   freeShooting = false;
   level = 1;
   levelPoints = 0;
-  arrowsLeft = ARROWS_PER_LEVEL;
+  arrowsLeft = ARROWS_PER_LEVEL[0];
   applyLevel();
 }
 
@@ -105,7 +106,7 @@ export function drawLevelHUD() {
   }
   const line1 = `LV ${level}`;
   const line2 = `${levelPoints}/${POINTS_TO_ADVANCE}`;
-  const line3 = `AR ${arrowsLeft}/${ARROWS_PER_LEVEL}`;
+  const line3 = `AR ${arrowsLeft}/${ARROWS_PER_LEVEL[level - 1]}`;
   drawPixelText(line1, W - 4 - textWidth(line1), 6, TEXT_COLOR);
   drawPixelText(line2, W - 4 - textWidth(line2), 14, TEXT_DIM);
   drawPixelText(line3, W - 4 - textWidth(line3), 22, TEXT_DIM);
