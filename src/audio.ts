@@ -83,30 +83,65 @@ async function loadAll() {
   startAmbienceLoop();
 }
 
-// Output is routed through a real <audio> element rather than straight to
-// ctx.destination — iOS mutes raw AudioContext output when the phone's
-// silent switch is on, but audio played through an actual HTMLMediaElement
-// is treated as media playback and bypasses it (the same reason
-// via-brendel's plain <audio>-tag music player isn't affected by it).
-let outputEl: HTMLAudioElement | null = null;
+// A raw AudioContext defaults to iOS's "ambient" audio session category,
+// which the physical silent switch mutes entirely (the still-moving-tree
+// project hit the same thing — routing output through a MediaStream into a
+// real <audio> element, tried first here, did NOT fix it either). What
+// actually works: playing a genuine <audio> element — even one whose
+// content is silence — elevates the whole page's audio session to
+// "playback", and the separately-routed AudioContext output inherits that
+// too. The elevated category only lasts as long as that element is
+// actively playing, hence looping it for as long as the page is open.
+const SILENT_WAV_DATA_URI = 'data:audio/wav;base64,UklGRqYJAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgATElTVBoAAABJTkZPSVNGVA0AAABMYXZmNjEuNy4xMDMAAGRhdGFgCQAAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
+
+let silentSessionAudio: HTMLAudioElement | null = null;
+function elevateAudioSessionForSilentSwitch() {
+  if (!silentSessionAudio) {
+    silentSessionAudio = new Audio(SILENT_WAV_DATA_URI);
+    silentSessionAudio.loop = true;
+  }
+  silentSessionAudio.play().catch(() => {
+    // Some browsers reject this outside a "real enough" gesture — harmless
+    // to ignore, the mobile unlock buffer below still covers most cases.
+  });
+}
+
+// iOS Safari sometimes leaves the AudioContext in a state where resume()
+// resolves but no sound actually comes out until something is explicitly
+// played within the same user gesture — scheduling one silent sample
+// immediately is the standard workaround.
+function unlockMobileAudio(audioCtx: AudioContext) {
+  const buffer = audioCtx.createBuffer(1, 1, 22050);
+  const source = audioCtx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audioCtx.destination);
+  source.start(0);
+}
 
 export function unlockAudio() {
   if (ctx) {
-    if (ctx.state === 'suspended') ctx.resume();
-    outputEl?.play().catch(() => {});
+    if (ctx.state === 'running') {
+      elevateAudioSessionForSilentSwitch();
+    } else if (ctx.state === 'suspended') {
+      ctx.resume().then(() => {
+        if (ctx?.state === 'running') elevateAudioSessionForSilentSwitch();
+      });
+    }
     return;
   }
   const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   ctx = new AC();
+  unlockMobileAudio(ctx);
   masterGain = ctx.createGain();
   masterGain.gain.value = 0.6;
-  const dest = ctx.createMediaStreamDestination();
-  masterGain.connect(dest);
-  outputEl = document.createElement('audio');
-  outputEl.srcObject = dest.stream;
-  outputEl.style.display = 'none';
-  document.body.appendChild(outputEl);
-  outputEl.play().catch(() => {});
+  masterGain.connect(ctx.destination);
+  if (ctx.state === 'running') {
+    elevateAudioSessionForSilentSwitch();
+  } else {
+    ctx.resume().then(() => {
+      if (ctx?.state === 'running') elevateAudioSessionForSilentSwitch();
+    });
+  }
   loadAll();
 }
 
