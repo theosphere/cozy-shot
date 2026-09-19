@@ -113,7 +113,7 @@ function playOnce(name: SoundName, gainValue = 1, rate = 1): { src: AudioBufferS
 // reshuffled once exhausted, so every track gets heard before any repeat)
 // rather than locking onto one for the whole session — each track
 // crossfades into the next as it ends, chaining itself via setTimeout.
-const AMBIENCE_LEVEL = 0.05;
+const AMBIENCE_LEVEL = 0.09;
 const AMBIENCE_CROSSFADE = 2; // seconds of overlap between tracks
 let ambienceOrder: number[] = [];
 let ambienceIndex = 0;
