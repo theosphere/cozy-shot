@@ -94,7 +94,6 @@ function updateAim(touchX: number, touchY: number) {
     aimDX = 0;
     aimDY = -1;
   }
-  audio.updatePullSound(currentPower());
 }
 
 export function pullLength(): number {

@@ -25,23 +25,8 @@ const SOURCES = {
     'sfx/release/release-05.ogg',
   ],
   flight: ['sfx/flight/flight-01.ogg', 'sfx/flight/flight-02.ogg'],
-  hit: [
-    'sfx/hit/hit-01.ogg',
-    'sfx/hit/hit-02.ogg',
-    'sfx/hit/hit-03.ogg',
-    'sfx/hit/hit-04.ogg',
-    'sfx/hit/hit-05.ogg',
-    'sfx/hit/hit-06.ogg',
-    'sfx/hit/hit-07.ogg',
-    'sfx/hit/hit-08.ogg',
-    'sfx/hit/hit-09.ogg',
-    'sfx/hit/hit-10.ogg',
-    'sfx/hit/hit-11.ogg',
-    'sfx/hit/hit-12.ogg',
-    'sfx/hit/hit-13.ogg',
-    'sfx/hit/hit-14.ogg',
-  ],
-  miss: ['sfx/miss/miss-01.ogg'],
+  hit: ['sfx/hit/hit-01.ogg'], // exp.wav
+  miss: ['sfx/miss/miss-01.ogg'], // freesound_community-arrow-impact-87260
   ambience: ['sfx/ambience/ambience-01.ogg', 'sfx/ambience/ambience-02.ogg', 'sfx/ambience/ambience-03.ogg'],
 } satisfies Record<string, string[]>;
 type SoundName = keyof typeof SOURCES;
@@ -121,36 +106,18 @@ function startAmbienceLoop() {
   gain.gain.linearRampToValueAtTime(0.05, now() + 3);
 }
 
-// --- Pulling the string: a real recording, looped and pitched up with
-// power. One of the pull variations is picked when the draw begins and
-// held for that whole draw (not re-picked while updating/looping).
+// --- Pulling the string: one real recording, played once (not looped) --
+// the instant the draw begins — going from idle to drawing is a single
+// event, not a sustained hold, so the sound is too.
 let pullSrc: AudioBufferSourceNode | null = null;
 let pullGain: GainNode | null = null;
 
 export function startPullSound() {
-  const buf = pickBuffer('pull');
-  if (!ctx || !masterGain || !buf) return;
-  stopPullSound(true);
-  const t = now();
-  const src = ctx.createBufferSource();
-  src.buffer = buf;
-  src.loop = true;
-  src.playbackRate.value = 0.9;
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0, t);
-  gain.gain.linearRampToValueAtTime(0.55, t + 0.08);
-  src.connect(gain).connect(masterGain);
-  src.start(t);
-  pullSrc = src;
-  pullGain = gain;
-}
-// Called every time the draw updates — power is 0..1, straight from
-// flight.ts's currentPower(), so the sound's pitch tracks the pull. Kept
-// to a narrow range: too wide a playbackRate swing turns any real
-// recording into a cartoon chipmunk squeal.
-export function updatePullSound(power: number) {
-  if (!pullSrc) return;
-  pullSrc.playbackRate.linearRampToValueAtTime(0.9 + power * 0.45, now() + 0.05);
+  const r = playOnce('pull', 0.7);
+  if (!r) return;
+  stopPullSound(true); // cut off a still-playing one-shot from a prior draw
+  pullSrc = r.src;
+  pullGain = r.gain;
 }
 // immediate=true for a canceled (too-short) pull, no release tail needed.
 export function stopPullSound(immediate = false) {
