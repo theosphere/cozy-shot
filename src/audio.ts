@@ -22,7 +22,7 @@ function now(): number {
 // hit is deliberately the quietest.
 const BASE_GAIN = 0.7;
 const MIX = {
-  pull: BASE_GAIN * 1.3,
+  pull: BASE_GAIN * 1.1,
   release: BASE_GAIN,
   flight: BASE_GAIN * 0.8,
   hit: BASE_GAIN * 0.6,
