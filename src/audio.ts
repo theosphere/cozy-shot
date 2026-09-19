@@ -109,17 +109,54 @@ function playOnce(name: SoundName, gainValue = 1, rate = 1): { src: AudioBufferS
   return { src, gain };
 }
 
-function startAmbienceLoop() {
-  const buf = pickBuffer('ambience');
-  if (!ctx || !masterGain || !buf) return;
+// Ambience rotates through ALL of its variations (a shuffled order,
+// reshuffled once exhausted, so every track gets heard before any repeat)
+// rather than locking onto one for the whole session — each track
+// crossfades into the next as it ends, chaining itself via setTimeout.
+const AMBIENCE_LEVEL = 0.05;
+const AMBIENCE_CROSSFADE = 2; // seconds of overlap between tracks
+let ambienceOrder: number[] = [];
+let ambienceIndex = 0;
+
+function shuffled(n: number): number[] {
+  const idx = Array.from({ length: n }, (_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [idx[i], idx[j]] = [idx[j], idx[i]];
+  }
+  return idx;
+}
+
+function playNextAmbience(fadeIn: number) {
+  const list = buffers.ambience;
+  if (!ctx || !masterGain || !list || list.length === 0) return;
+  if (ambienceIndex >= ambienceOrder.length) {
+    ambienceOrder = shuffled(list.length);
+    ambienceIndex = 0;
+  }
+  const buf = list[ambienceOrder[ambienceIndex]];
+  ambienceIndex++;
+
+  const t = now();
   const src = ctx.createBufferSource();
   src.buffer = buf;
-  src.loop = true;
   const gain = ctx.createGain();
-  gain.gain.value = 0;
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(AMBIENCE_LEVEL, t + fadeIn);
+  const fadeOutStart = Math.max(fadeIn, buf.duration - AMBIENCE_CROSSFADE);
+  gain.gain.setValueAtTime(AMBIENCE_LEVEL, t + fadeOutStart);
+  gain.gain.linearRampToValueAtTime(0, t + buf.duration);
   src.connect(gain).connect(masterGain);
-  src.start();
-  gain.gain.linearRampToValueAtTime(0.05, now() + 3);
+  src.start(t);
+  src.stop(t + buf.duration + 0.05);
+
+  window.setTimeout(() => playNextAmbience(AMBIENCE_CROSSFADE), Math.max(200, fadeOutStart * 1000));
+}
+
+function startAmbienceLoop() {
+  ambienceOrder = [];
+  ambienceIndex = 0;
+  playNextAmbience(3); // gentle fade-in for the very first track of the session
 }
 
 // --- Pulling the string: one real recording, played once (not looped) --
