@@ -27,6 +27,7 @@ const MIX = {
   flight: BASE_GAIN * 0.8,
   hit: BASE_GAIN * 0.6,
   miss: BASE_GAIN * 0.8,
+  victory: BASE_GAIN,
 } as const;
 
 const SOURCES = {
@@ -42,6 +43,7 @@ const SOURCES = {
   hit: ['sfx/hit/hit-01.ogg', 'sfx/hit/hit-02.ogg'], // split from impact2.mp3
   miss: ['sfx/miss/miss-01.ogg'], // freesound_community-arrow-impact-87260
   ambience: ['sfx/ambience/ambience-01.ogg', 'sfx/ambience/ambience-02.ogg', 'sfx/ambience/ambience-03.ogg'],
+  victory: ['sfx/victory/victory-01.ogg'],
 } satisfies Record<string, string[]>;
 type SoundName = keyof typeof SOURCES;
 
@@ -179,4 +181,9 @@ export function playHit(score: number) {
 }
 export function playMiss() {
   playOnce('miss', MIX.miss, 1);
+}
+
+// --- Victory: the piñata/confetti celebration jingle -----------------------
+export function playVictory() {
+  playOnce('victory', MIX.victory);
 }

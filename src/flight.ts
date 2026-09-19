@@ -261,6 +261,7 @@ function updateFlight(dt: number) {
           celebrationX = flyX;
           celebrationY = flyY;
           celebration.spawnConfetti(flyX, flyY);
+          audio.playVictory();
         }
         beginResult(title, ring.score > 0 ? `SCORE ${ring.score}` : 'MISSED THE BOARD', true);
       } else if (outcome === 'advance') {
@@ -278,6 +279,7 @@ function updateFlight(dt: number) {
         celebrationX = flyX;
         celebrationY = flyY;
         celebration.spawnConfetti(flyX, flyY);
+        audio.playVictory();
         beginResult(title, 'VICTORY', true);
       } else if (outcome === 'fail') {
         // A level once reached is never lost — this just means the
