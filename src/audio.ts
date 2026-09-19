@@ -15,6 +15,20 @@ function now(): number {
   return ctx ? ctx.currentTime : 0;
 }
 
+// Every source file is peak-normalized to a consistent level (see the
+// tooling notes in public/sfx/) — these are the intentional relative mix
+// levels on top of that shared baseline, not corrections for mismatched
+// source loudness. Pull is deliberately the loudest thing in the mix;
+// hit is deliberately the quietest.
+const BASE_GAIN = 0.7;
+const MIX = {
+  pull: BASE_GAIN * 1.3,
+  release: BASE_GAIN,
+  flight: BASE_GAIN * 0.8,
+  hit: BASE_GAIN * 0.6,
+  miss: BASE_GAIN * 0.8,
+} as const;
+
 const SOURCES = {
   pull: ['sfx/pull/pull-01.ogg', 'sfx/pull/pull-02.ogg', 'sfx/pull/pull-03.ogg', 'sfx/pull/pull-04.ogg', 'sfx/pull/pull-05.ogg'],
   release: [
@@ -25,7 +39,10 @@ const SOURCES = {
     'sfx/release/release-05.ogg',
   ],
   flight: ['sfx/flight/flight-01.ogg', 'sfx/flight/flight-02.ogg'],
-  hit: ['sfx/hit/hit-01.ogg'], // exp.wav
+  // The wood-impact recordings — exp.wav was too harsh/loud relative to
+  // everything else, so the hit sound is this instead: 5 clips split out
+  // of a single multi-take compilation.
+  hit: ['sfx/hit/hit-01.ogg', 'sfx/hit/hit-02.ogg', 'sfx/hit/hit-03.ogg', 'sfx/hit/hit-04.ogg', 'sfx/hit/hit-05.ogg'],
   miss: ['sfx/miss/miss-01.ogg'], // freesound_community-arrow-impact-87260
   ambience: ['sfx/ambience/ambience-01.ogg', 'sfx/ambience/ambience-02.ogg', 'sfx/ambience/ambience-03.ogg'],
 } satisfies Record<string, string[]>;
@@ -113,7 +130,7 @@ let pullSrc: AudioBufferSourceNode | null = null;
 let pullGain: GainNode | null = null;
 
 export function startPullSound() {
-  const r = playOnce('pull', 0.7);
+  const r = playOnce('pull', MIX.pull);
   if (!r) return;
   stopPullSound(true); // cut off a still-playing one-shot from a prior draw
   pullSrc = r.src;
@@ -134,14 +151,14 @@ export function stopPullSound(immediate = false) {
 
 // --- Release: real bow-shot samples -----------------------------------------
 export function playRelease(power: number) {
-  playOnce('release', 0.8, 0.95 + power * 0.1);
+  playOnce('release', MIX.release, 0.95 + power * 0.1);
 }
 
 // --- Flight: a quick whoosh, cut short if the arrow lands early ------------
 let flightGain: GainNode | null = null;
 let flightSrc: AudioBufferSourceNode | null = null;
 export function startFlightSound() {
-  const r = playOnce('flight', 0.5);
+  const r = playOnce('flight', MIX.flight);
   if (!r) return;
   flightSrc = r.src;
   flightGain = r.gain;
@@ -161,8 +178,8 @@ export function stopFlightSound() {
 export function playHit(score: number) {
   // A slightly higher, brighter pitch on the best shots — still a real
   // sample, just played back a little faster.
-  playOnce('hit', 0.9, score >= 4 ? 1.15 : 1);
+  playOnce('hit', MIX.hit, score >= 4 ? 1.15 : 1);
 }
 export function playMiss() {
-  playOnce('miss', 0.8, 1);
+  playOnce('miss', MIX.miss, 1);
 }
