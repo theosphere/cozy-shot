@@ -39,10 +39,7 @@ const SOURCES = {
     'sfx/release/release-05.ogg',
   ],
   flight: ['sfx/flight/flight-01.ogg', 'sfx/flight/flight-02.ogg'],
-  // The wood-impact recordings — exp.wav was too harsh/loud relative to
-  // everything else, so the hit sound is this instead: 5 clips split out
-  // of a single multi-take compilation.
-  hit: ['sfx/hit/hit-01.ogg', 'sfx/hit/hit-02.ogg', 'sfx/hit/hit-03.ogg', 'sfx/hit/hit-04.ogg', 'sfx/hit/hit-05.ogg'],
+  hit: ['sfx/hit/hit-01.ogg', 'sfx/hit/hit-02.ogg'], // split from impact2.mp3
   miss: ['sfx/miss/miss-01.ogg'], // freesound_community-arrow-impact-87260
   ambience: ['sfx/ambience/ambience-01.ogg', 'sfx/ambience/ambience-02.ogg', 'sfx/ambience/ambience-03.ogg'],
 } satisfies Record<string, string[]>;
