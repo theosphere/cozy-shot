@@ -32,20 +32,52 @@ for (let i = 0; i < 14; i++) {
   });
 }
 
-export function drawBackground(dt: number, glowScreenY: number) {
+// The dithered top->bottom gradient never changes frame to frame (nothing
+// it depends on — BG_TOP/BG_BOTTOM/x/y — is dynamic), so it's baked once
+// onto an offscreen canvas instead of being re-stamped with ~86,000
+// individual ctx.fillRect calls every frame: at 60fps that was ~5M canvas
+// draw calls a second just for the background, the single biggest cost in
+// the whole game and the main reason it was running hot on phones. Each
+// frame now blits that baked canvas with one drawImage (GPU-composited,
+// unlike a same-size putImageData round-trip, which measured *worse* here
+// — Chrome already batches plain fillRect sequences reasonably well, so
+// putImageData's full pixel-buffer upload lost more than it saved). The
+// glow is a radial gradient fill instead of per-pixel dithering — same
+// idea, trading pixel-perfect dither on this one soft highlight for a
+// single hardware-accelerated fill.
+let baseGradientCanvas: HTMLCanvasElement | null = null;
+function buildBaseGradientCanvas(): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const c2d = c.getContext('2d')!;
   for (let y = 0; y < H; y++) {
     const t = y / H;
     for (let x = 0; x < W; x++) {
-      let color = mixColor(BG_TOP, BG_BOTTOM, x, y, t);
-      const gdx = x - BOW_CENTER_X;
-      const gdy = y - glowScreenY;
-      const gd = Math.hypot(gdx, gdy * 0.7);
-      const glowT = Math.max(0, 1 - gd / 130) * 0.5;
-      if (glowT > 0.02) color = mixColor(color, GLOW, x, y, glowT);
-      ctx.fillStyle = rgbStr(color);
-      ctx.fillRect(x, y, 1, 1);
+      c2d.fillStyle = rgbStr(mixColor(BG_TOP, BG_BOTTOM, x, y, t));
+      c2d.fillRect(x, y, 1, 1);
     }
   }
+  return c;
+}
+
+const GLOW_RADIUS = 130;
+const GLOW_Y_SCALE = 0.7; // matches the old per-pixel falloff's gdy*0.7 term
+
+export function drawBackground(dt: number, glowScreenY: number) {
+  if (!baseGradientCanvas) baseGradientCanvas = buildBaseGradientCanvas();
+  ctx.drawImage(baseGradientCanvas, 0, 0);
+
+  ctx.save();
+  ctx.translate(BOW_CENTER_X, glowScreenY);
+  ctx.scale(1, 1 / GLOW_Y_SCALE);
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, GLOW_RADIUS);
+  grad.addColorStop(0, `rgba(${GLOW[0]},${GLOW[1]},${GLOW[2]},0.5)`);
+  grad.addColorStop(1, `rgba(${GLOW[0]},${GLOW[1]},${GLOW[2]},0)`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(-GLOW_RADIUS, -GLOW_RADIUS, GLOW_RADIUS * 2, GLOW_RADIUS * 2);
+  ctx.restore();
+
   for (const e of ambientEmbers) {
     e.age += dt;
     e.x += e.vx * dt;
