@@ -1,9 +1,12 @@
-// Real recorded sound effects (see CREDITS.md for sources/licenses), played
-// through the Web Audio API so we still get sample-accurate looping and
-// live gain/pitch control — no synthesis, every buffer here is a decoded
-// audio file. Browsers block audio until a real user gesture, so the
-// context is created lazily and resumed on the first pointer interaction
-// (see input.ts's unlockAudio() call).
+// Real recorded sound effects, played through the Web Audio API so we
+// still get sample-accurate looping and live gain/pitch control — no
+// synthesis, every buffer here is a decoded audio file. Browsers block
+// audio until a real user gesture, so the context is created lazily and
+// resumed on the first pointer interaction (see input.ts's unlockAudio()
+// call).
+//
+// Most categories have several recorded variations (see public/sfx/) —
+// each play picks one at random rather than always playing the same take.
 
 let ctx: AudioContext | null = null;
 let masterGain: GainNode | null = null;
@@ -13,40 +16,70 @@ function now(): number {
 }
 
 const SOURCES = {
-  pull: 'sfx/pull.ogg',
-  release: 'sfx/release.ogg',
-  flight: 'sfx/flight.ogg',
-  hit: 'sfx/hit.ogg',
-  miss: 'sfx/miss.ogg',
-  ambiance: 'sfx/ambiance.ogg',
-  fire: 'sfx/fire.ogg',
-} as const;
+  pull: ['sfx/pull/pull-01.ogg', 'sfx/pull/pull-02.ogg', 'sfx/pull/pull-03.ogg', 'sfx/pull/pull-04.ogg', 'sfx/pull/pull-05.ogg'],
+  release: [
+    'sfx/release/release-01.ogg',
+    'sfx/release/release-02.ogg',
+    'sfx/release/release-03.ogg',
+    'sfx/release/release-04.ogg',
+    'sfx/release/release-05.ogg',
+  ],
+  flight: ['sfx/flight/flight-01.ogg', 'sfx/flight/flight-02.ogg'],
+  hit: [
+    'sfx/hit/hit-01.ogg',
+    'sfx/hit/hit-02.ogg',
+    'sfx/hit/hit-03.ogg',
+    'sfx/hit/hit-04.ogg',
+    'sfx/hit/hit-05.ogg',
+    'sfx/hit/hit-06.ogg',
+    'sfx/hit/hit-07.ogg',
+    'sfx/hit/hit-08.ogg',
+    'sfx/hit/hit-09.ogg',
+    'sfx/hit/hit-10.ogg',
+    'sfx/hit/hit-11.ogg',
+    'sfx/hit/hit-12.ogg',
+    'sfx/hit/hit-13.ogg',
+    'sfx/hit/hit-14.ogg',
+  ],
+  miss: ['sfx/miss/miss-01.ogg'],
+  ambience: ['sfx/ambience/ambience-01.ogg', 'sfx/ambience/ambience-02.ogg', 'sfx/ambience/ambience-03.ogg'],
+} satisfies Record<string, string[]>;
 type SoundName = keyof typeof SOURCES;
 
-const buffers: Partial<Record<SoundName, AudioBuffer>> = {};
+const buffers: Partial<Record<SoundName, AudioBuffer[]>> = {};
+function pickBuffer(name: SoundName): AudioBuffer | null {
+  const list = buffers[name];
+  if (!list || list.length === 0) return null;
+  return list[Math.floor(Math.random() * list.length)];
+}
 
 async function loadAll() {
   const audioCtx = ctx!;
   await Promise.all(
     (Object.keys(SOURCES) as SoundName[]).map(async (name) => {
-      // Sound files are optional — drop them into public/sfx/ (see the
-      // README there) whenever they're ready. A missing/undecodable file
-      // just leaves that buffer unset; every play/loop call already
-      // guards on the buffer being present, so nothing else is affected.
-      try {
-        const res = await fetch(SOURCES[name]);
-        if (!res.ok) return;
-        const data = await res.arrayBuffer();
-        buffers[name] = await audioCtx.decodeAudioData(data);
-      } catch {
-        // ignore — this sound just stays silent
-      }
+      const decoded: AudioBuffer[] = [];
+      await Promise.all(
+        SOURCES[name].map(async (path) => {
+          // Every file is optional — a missing/undecodable one just isn't
+          // added to the pool. A category with at least one loaded
+          // variation still works; only pickBuffer's null case is skipped.
+          try {
+            const res = await fetch(path);
+            if (!res.ok) return;
+            const data = await res.arrayBuffer();
+            decoded.push(await audioCtx.decodeAudioData(data));
+          } catch {
+            // ignore — this variation just isn't in the pool
+          }
+        })
+      );
+      buffers[name] = decoded;
     })
   );
-  // Ambiance and fire are continuous background loops — start them as soon
-  // as they're decoded, whenever that happens to land relative to unlock.
-  startLoop('ambiance', 0.05, 3);
-  startLoop('fire', 0.035, 3);
+  // Ambience is a continuous background loop — pick one of its variations
+  // for this whole session (not re-rolled per play) and start it as soon
+  // as it's decoded, whenever that lands relative to unlock.
+  startAmbienceLoop();
 }
 
 export function unlockAudio() {
@@ -63,7 +96,7 @@ export function unlockAudio() {
 }
 
 function playOnce(name: SoundName, gainValue = 1, rate = 1): { src: AudioBufferSourceNode; gain: GainNode } | null {
-  const buf = buffers[name];
+  const buf = pickBuffer(name);
   if (!ctx || !masterGain || !buf) return null;
   const src = ctx.createBufferSource();
   src.buffer = buf;
@@ -75,10 +108,8 @@ function playOnce(name: SoundName, gainValue = 1, rate = 1): { src: AudioBufferS
   return { src, gain };
 }
 
-const loopGains: Partial<Record<SoundName, GainNode>> = {};
-const loopSrcs: Partial<Record<SoundName, AudioBufferSourceNode>> = {};
-function startLoop(name: SoundName, targetGain: number, fadeSeconds: number) {
-  const buf = buffers[name];
+function startAmbienceLoop() {
+  const buf = pickBuffer('ambience');
   if (!ctx || !masterGain || !buf) return;
   const src = ctx.createBufferSource();
   src.buffer = buf;
@@ -87,17 +118,17 @@ function startLoop(name: SoundName, targetGain: number, fadeSeconds: number) {
   gain.gain.value = 0;
   src.connect(gain).connect(masterGain);
   src.start();
-  gain.gain.linearRampToValueAtTime(targetGain, now() + fadeSeconds);
-  loopSrcs[name] = src;
-  loopGains[name] = gain;
+  gain.gain.linearRampToValueAtTime(0.05, now() + 3);
 }
 
-// --- Pulling the string: a real creak, looped and pitched up with power --
+// --- Pulling the string: a real recording, looped and pitched up with
+// power. One of the pull variations is picked when the draw begins and
+// held for that whole draw (not re-picked while updating/looping).
 let pullSrc: AudioBufferSourceNode | null = null;
 let pullGain: GainNode | null = null;
 
 export function startPullSound() {
-  const buf = buffers.pull;
+  const buf = pickBuffer('pull');
   if (!ctx || !masterGain || !buf) return;
   stopPullSound(true);
   const t = now();
@@ -114,10 +145,9 @@ export function startPullSound() {
   pullGain = gain;
 }
 // Called every time the draw updates — power is 0..1, straight from
-// flight.ts's currentPower(), so the creak's pitch tracks the pull. Kept
-// to a narrow range: this is a rasping rope/string-under-tension texture
-// (broadband creaks, not a tonal squeak), and too wide a playbackRate
-// swing turns any real recording into a cartoon chipmunk squeal.
+// flight.ts's currentPower(), so the sound's pitch tracks the pull. Kept
+// to a narrow range: too wide a playbackRate swing turns any real
+// recording into a cartoon chipmunk squeal.
 export function updatePullSound(power: number) {
   if (!pullSrc) return;
   pullSrc.playbackRate.linearRampToValueAtTime(0.9 + power * 0.45, now() + 0.05);
@@ -135,7 +165,7 @@ export function stopPullSound(immediate = false) {
   pullGain = null;
 }
 
-// --- Release: real bow-shot sample ------------------------------------------
+// --- Release: real bow-shot samples -----------------------------------------
 export function playRelease(power: number) {
   playOnce('release', 0.8, 0.95 + power * 0.1);
 }
@@ -162,8 +192,8 @@ export function stopFlightSound() {
 
 // --- Impact: hit or miss, real thuds ----------------------------------------
 export function playHit(score: number) {
-  // A slightly higher, brighter pitch on the best shots — still the same
-  // real sample, just played back a little faster.
+  // A slightly higher, brighter pitch on the best shots — still a real
+  // sample, just played back a little faster.
   playOnce('hit', 0.9, score >= 4 ? 1.15 : 1);
 }
 export function playMiss() {
