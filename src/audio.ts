@@ -83,16 +83,30 @@ async function loadAll() {
   startAmbienceLoop();
 }
 
+// Output is routed through a real <audio> element rather than straight to
+// ctx.destination — iOS mutes raw AudioContext output when the phone's
+// silent switch is on, but audio played through an actual HTMLMediaElement
+// is treated as media playback and bypasses it (the same reason
+// via-brendel's plain <audio>-tag music player isn't affected by it).
+let outputEl: HTMLAudioElement | null = null;
+
 export function unlockAudio() {
   if (ctx) {
     if (ctx.state === 'suspended') ctx.resume();
+    outputEl?.play().catch(() => {});
     return;
   }
   const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   ctx = new AC();
   masterGain = ctx.createGain();
   masterGain.gain.value = 0.6;
-  masterGain.connect(ctx.destination);
+  const dest = ctx.createMediaStreamDestination();
+  masterGain.connect(dest);
+  outputEl = document.createElement('audio');
+  outputEl.srcObject = dest.stream;
+  outputEl.style.display = 'none';
+  document.body.appendChild(outputEl);
+  outputEl.play().catch(() => {});
   loadAll();
 }
 
