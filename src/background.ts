@@ -40,11 +40,15 @@ for (let i = 0; i < 14; i++) {
 // the whole game and the main reason it was running hot on phones. Each
 // frame now blits that baked canvas with one drawImage (GPU-composited,
 // unlike a same-size putImageData round-trip, which measured *worse* here
-// — Chrome already batches plain fillRect sequences reasonably well, so
-// putImageData's full pixel-buffer upload lost more than it saved). The
-// glow is a radial gradient fill instead of per-pixel dithering — same
-// idea, trading pixel-perfect dither on this one soft highlight for a
-// single hardware-accelerated fill.
+// — Chrome already batches plain fillRect sequences reasonably well, so a
+// putImageData covering the WHOLE canvas lost more than it saved).
+//
+// The glow still needs the original per-pixel dithered blend — a smooth
+// CanvasGradient was tried here first and profiled about the same, but it
+// breaks the pixel-art dither look everywhere else in the scene — so it's
+// done via a getImageData/putImageData pair scoped to just the glow's own
+// bounding box (not the full canvas), which keeps it cheap without giving
+// up the dithering.
 let baseGradientCanvas: HTMLCanvasElement | null = null;
 function buildBaseGradientCanvas(): HTMLCanvasElement {
   const c = document.createElement('canvas');
@@ -68,15 +72,34 @@ export function drawBackground(dt: number, glowScreenY: number) {
   if (!baseGradientCanvas) baseGradientCanvas = buildBaseGradientCanvas();
   ctx.drawImage(baseGradientCanvas, 0, 0);
 
-  ctx.save();
-  ctx.translate(BOW_CENTER_X, glowScreenY);
-  ctx.scale(1, 1 / GLOW_Y_SCALE);
-  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, GLOW_RADIUS);
-  grad.addColorStop(0, `rgba(${GLOW[0]},${GLOW[1]},${GLOW[2]},0.5)`);
-  grad.addColorStop(1, `rgba(${GLOW[0]},${GLOW[1]},${GLOW[2]},0)`);
-  ctx.fillStyle = grad;
-  ctx.fillRect(-GLOW_RADIUS, -GLOW_RADIUS, GLOW_RADIUS * 2, GLOW_RADIUS * 2);
-  ctx.restore();
+  const yReach = GLOW_RADIUS / GLOW_Y_SCALE;
+  const yMin = Math.max(0, Math.floor(glowScreenY - yReach));
+  const yMax = Math.min(H - 1, Math.ceil(glowScreenY + yReach));
+  const xMin = Math.max(0, Math.floor(BOW_CENTER_X - GLOW_RADIUS));
+  const xMax = Math.min(W - 1, Math.ceil(BOW_CENTER_X + GLOW_RADIUS));
+  const bw = xMax - xMin + 1;
+  const bh = yMax - yMin + 1;
+  if (bw > 0 && bh > 0) {
+    const region = ctx.getImageData(xMin, yMin, bw, bh);
+    const data = region.data;
+    for (let y = yMin; y <= yMax; y++) {
+      const gdy = (y - glowScreenY) * GLOW_Y_SCALE;
+      const gdy2 = gdy * gdy;
+      for (let x = xMin; x <= xMax; x++) {
+        const gdx = x - BOW_CENTER_X;
+        const gd = Math.sqrt(gdx * gdx + gdy2);
+        const glowT = Math.max(0, 1 - gd / GLOW_RADIUS) * 0.5;
+        if (glowT <= 0.02) continue;
+        const i = ((y - yMin) * bw + (x - xMin)) * 4;
+        const base: [number, number, number] = [data[i], data[i + 1], data[i + 2]];
+        const blended = mixColor(base, GLOW, x, y, glowT);
+        data[i] = blended[0];
+        data[i + 1] = blended[1];
+        data[i + 2] = blended[2];
+      }
+    }
+    ctx.putImageData(region, xMin, yMin);
+  }
 
   for (const e of ambientEmbers) {
     e.age += dt;
